@@ -54,6 +54,12 @@ def main(argv=None):
                         help="提取关键画面（仅视频；默认按章节起点，无章节则按固定间隔）")
     parser.add_argument("--frame-interval", type=float, default=60.0,
                         help="无章节时关键画面的截取间隔（秒，默认 60）")
+    parser.add_argument("--scene", action="store_true",
+                        help="按场景切换自动选帧（开启后忽略固定间隔，仅视频）")
+    parser.add_argument("--scene-threshold", type=float, default=0.4,
+                        help="场景切换检测阈值，越大越严格（默认 0.4）")
+    parser.add_argument("--frame-limit", type=int, default=20,
+                        help="场景切换最多截取帧数（默认 20）")
     parser.add_argument("--keep-audio", action="store_true", help="保留提取的临时音频")
     # 说话人分离
     parser.add_argument("--diarize", action="store_true", help="启用说话人分离（需 pyannote + HF token）")
@@ -82,6 +88,9 @@ def main(argv=None):
         include_srt=not args.no_srt,
         extract_frames=args.frames,
         frame_interval=args.frame_interval,
+        scene_detect=args.scene,
+        scene_threshold=args.scene_threshold,
+        frame_limit=args.frame_limit,
         diarize=args.diarize,
         hf_token=args.hf_token,
         num_speakers=args.num_speakers,

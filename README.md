@@ -158,6 +158,9 @@ python -m mp4tomd.cli 会议录音/ -c --combined-output 汇总.md
 | `--no-srt` | 不生成最初的 SRT 字幕 `.srt` |
 | `--frames` | 提取关键画面并嵌入 Markdown（仅视频） |
 | `--frame-interval` | 无章节时关键画面截取间隔（秒，默认 60） |
+| `--scene` | 按场景切换（scene-change）自动选帧，开启后忽略固定间隔（仅视频） |
+| `--scene-threshold` | 场景切换检测阈值，越大越严格（默认 0.4） |
+| `--frame-limit` | 场景切换最多截取帧数（默认 20） |
 | `-d, --output-dir` | 批量输出目录（默认与每个输入文件同目录） |
 | `-r, --recursive` | 递归处理目录（含子目录） |
 | `-c, --combined` | 额外生成合并汇总 Markdown（所有文件合入一篇） |
@@ -208,7 +211,8 @@ python -m mp4tomd.cli 会议录音/ -c --combined-output 汇总.md
 对视频文件，可在关键时间点用 ffmpeg 截取画面，并以 `![关键画面 @时间](图片)` 的形式嵌入 Markdown：
 
 - 开启 `--chapters` 时：在每个**章节起点**截图，直接嵌在对应章节标题下方；
-- 未开启 `--chapters` 时：按固定间隔 `--frame-interval`（默认 60 秒）截图，单独生成「## 关键画面」小节；
+- 开启 `--scene` 时：基于 **镜头切换检测（scene-change）** 自动在切换点截图（用 ffmpeg `select='gt(scene,阈值)'` 滤镜），无需固定间隔；阈值 `--scene-threshold` 越大越严格（默认 0.4），最多 `--frame-limit` 帧（默认 20）；
+- 两者都未开启时：按固定间隔 `--frame-interval`（默认 60 秒）截图，单独生成「## 关键画面」小节；
 - 截取的图片保存在 `<源文件名>_frames/` 子目录（PNG），Markdown 中以相对路径引用，**请连同该文件夹一起分发**才能保证图片显示。
 
 > 纯音频文件无画面，开启此选项会被自动忽略。此功能依赖 ffmpeg。
@@ -221,9 +225,13 @@ python -m mp4tomd.cli 会议.mp4 --chapters --frames
 
 # 无章节时每 30 秒截一帧
 python -m mp4tomd.cli 讲座.mp4 --frames --frame-interval 30
+
+# 基于场景切换自动选帧（忽略固定间隔）
+python -m mp4tomd.cli 课程.mp4 --frames --scene
+python -m mp4tomd.cli 课程.mp4 --frames --scene --scene-threshold 0.5 --frame-limit 30
 ```
 
-GUI：勾选「提取关键画面（仅视频）」，并可在「画面间隔(秒)」设置间隔。
+GUI：勾选「提取关键画面（仅视频）」；勾选「按场景切换自动选帧（开启后忽略固定间隔）」即启用场景检测，并可在「画面间隔(秒)」设置固定间隔。
 
 ## 模型选择建议
 

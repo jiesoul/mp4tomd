@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime
 import glob
 import os
+import re
 import shutil
 import subprocess
 
@@ -111,6 +112,36 @@ def extract_key_frames(video_path: str, timestamps, out_dir: str) -> list:
             results.append((float(ts), out_path))
         except subprocess.CalledProcessError:
             continue
+        return results
+
+
+def detect_and_extract_scenes(video_path: str, out_dir: str,
+                              threshold: float = 0.4, max_frames: int = 20) -> list:
+    """基于镜头切换（scene-change）检测自动选帧并截图。
+
+    使用 ffmpeg 的 `select='gt(scene,threshold)'` 滤镜定位场景切换点，
+    最多截取 max_frames 帧（按检测顺序），返回 [(timestamp, 图片路径), ...]。
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    pattern = os.path.join(out_dir, "frame_%03d.png")
+    cmd = [
+        "ffmpeg", "-y", "-i", video_path,
+        "-vf", f"select='gt(scene,{threshold})',showinfo",
+        "-vsync", "vfr", "-frames:v", str(max_frames),
+        "-f", "image2", pattern,
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError:
+        return []
+    text = (res.stderr or "") + (res.stdout or "")
+    times = re.findall(r"pts_time:([0-9]+(?:\.[0-9]+)?)", text)
+    times = [float(t) for t in times[:max_frames]]
+    results = []
+    for i, ts in enumerate(times, start=1):
+        p = os.path.join(out_dir, f"frame_{i:03d}.png")
+        if os.path.exists(p):
+            results.append((ts, p))
     return results
 
 
@@ -389,6 +420,7 @@ def process_file(input_path, output_path=None, model_size="small",
                  chapters=False, chapter_gap=3.0,
                  include_txt=True, include_srt=True,
                  extract_frames=False, frame_interval=60.0,
+                 scene_detect=False, scene_threshold=0.4, frame_limit=20,
                  progress_callback=None) -> dict:
     if not os.path.isfile(input_path):
         raise FileNotFoundError(f"找不到输入文件：{input_path}")
@@ -445,17 +477,24 @@ def process_file(input_path, output_path=None, model_size="small",
                     "未检测到 ffmpeg，关键画面提取需要 ffmpeg。"
                     "请安装 ffmpeg 并加入 PATH（Windows：https://www.gyan.dev/ffmpeg/builds/）。"
                 )
+            frame_dir = os.path.join(md_dir, source_name + "_frames")
             if chapters:
                 chs = split_chapters(segments, chapter_gap)
                 timestamps = [ch["start"] for ch in chs]
+                extracted = extract_key_frames(input_path, timestamps, frame_dir)
+            elif scene_detect:
+                # 基于镜头切换自动选帧
+                extracted = detect_and_extract_scenes(
+                    input_path, frame_dir, threshold=scene_threshold,
+                    max_frames=frame_limit,
+                )
             else:
                 dur = getattr(info, "duration", None) or 0.0
                 step = max(int(frame_interval), 1)
                 timestamps = list(range(0, int(dur), step))
                 if not timestamps:
                     timestamps = [0.0]
-            frame_dir = os.path.join(md_dir, source_name + "_frames")
-            extracted = extract_key_frames(input_path, timestamps, frame_dir)
+                extracted = extract_key_frames(input_path, timestamps, frame_dir)
             frames = [
                 (ts, os.path.relpath(p, md_dir).replace(os.sep, "/"))
                 for ts, p in extracted
@@ -510,6 +549,7 @@ def process_batch(inputs, output_dir=None, output_path=None, combined=False,
                   num_speakers=None, chapters=False, chapter_gap=3.0,
                   include_txt=True, include_srt=True,
                   extract_frames=False, frame_interval=60.0,
+                  scene_detect=False, scene_threshold=0.4, frame_limit=20,
                   recursive=False, progress_callback=None) -> dict:
     """批量处理多个文件 / 目录 / 通配符。
 
@@ -558,6 +598,8 @@ def process_batch(inputs, output_dir=None, output_path=None, combined=False,
                 chapter_gap=chapter_gap,
                 include_txt=include_txt, include_srt=include_srt,
                 extract_frames=extract_frames, frame_interval=frame_interval,
+                scene_detect=scene_detect, scene_threshold=scene_threshold,
+                frame_limit=frame_limit,
                 progress_callback=_cb,
             )
             outputs.append(out)

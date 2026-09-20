@@ -65,6 +65,7 @@ class App(tk.Tk):
         self.batch_var = tk.BooleanVar(value=False)
         self.combined_var = tk.BooleanVar(value=False)
         self.frames_var = tk.BooleanVar(value=False)
+        self.scene_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(frm, text="生成时间轴", variable=self.timeline_var).grid(row=5, column=1, sticky="w", padx=6)
         ttk.Checkbutton(frm, text="生成全文", variable=self.fulltext_var).grid(row=6, column=1, sticky="w", padx=6)
         ttk.Checkbutton(frm, text="说话人分离（需 HF token）", variable=self.diarize_var).grid(row=7, column=1, sticky="w", padx=6)
@@ -73,32 +74,33 @@ class App(tk.Tk):
         ttk.Checkbutton(frm, text="批量处理（输入为目录/通配符，输出为文件夹）", variable=self.batch_var).grid(row=10, column=1, sticky="w", padx=6)
         ttk.Checkbutton(frm, text="合并为单个 MD（批量时可用）", variable=self.combined_var).grid(row=11, column=1, sticky="w", padx=6)
         ttk.Checkbutton(frm, text="提取关键画面（仅视频）", variable=self.frames_var).grid(row=12, column=1, sticky="w", padx=6)
+        ttk.Checkbutton(frm, text="按场景切换自动选帧（开启后忽略固定间隔）", variable=self.scene_var).grid(row=13, column=1, sticky="w", padx=6)
 
-        ttk.Label(frm, text="HF Token").grid(row=13, column=0, sticky="w", pady=3)
+        ttk.Label(frm, text="HF Token").grid(row=14, column=0, sticky="w", pady=3)
         self.hf_var = tk.StringVar(value=os.environ.get("HF_TOKEN", ""))
-        ttk.Entry(frm, textvariable=self.hf_var, show="*").grid(row=13, column=1, columnspan=2, sticky="ew", padx=6, pady=3)
+        ttk.Entry(frm, textvariable=self.hf_var, show="*").grid(row=14, column=1, columnspan=2, sticky="ew", padx=6, pady=3)
 
-        ttk.Label(frm, text="说话人数").grid(row=14, column=0, sticky="w", pady=3)
+        ttk.Label(frm, text="说话人数").grid(row=15, column=0, sticky="w", pady=3)
         self.numspk_var = tk.StringVar()
-        ttk.Entry(frm, textvariable=self.numspk_var, width=8).grid(row=14, column=1, sticky="w", padx=6, pady=3)
+        ttk.Entry(frm, textvariable=self.numspk_var, width=8).grid(row=15, column=1, sticky="w", padx=6, pady=3)
 
-        ttk.Label(frm, text="章节间隔(秒)").grid(row=15, column=0, sticky="w", pady=3)
+        ttk.Label(frm, text="章节间隔(秒)").grid(row=16, column=0, sticky="w", pady=3)
         self.gap_var = tk.StringVar(value="3.0")
-        ttk.Entry(frm, textvariable=self.gap_var, width=8).grid(row=15, column=1, sticky="w", padx=6, pady=3)
+        ttk.Entry(frm, textvariable=self.gap_var, width=8).grid(row=16, column=1, sticky="w", padx=6, pady=3)
 
-        ttk.Label(frm, text="画面间隔(秒)").grid(row=16, column=0, sticky="w", pady=3)
+        ttk.Label(frm, text="画面间隔(秒)").grid(row=17, column=0, sticky="w", pady=3)
         self.frame_interval_var = tk.StringVar(value="60")
-        ttk.Entry(frm, textvariable=self.frame_interval_var, width=8).grid(row=16, column=1, sticky="w", padx=6, pady=3)
+        ttk.Entry(frm, textvariable=self.frame_interval_var, width=8).grid(row=17, column=1, sticky="w", padx=6, pady=3)
 
         self.progress = ttk.Progressbar(frm, mode="determinate", maximum=100)
-        self.progress.grid(row=17, column=0, columnspan=4, sticky="ew", pady=10)
+        self.progress.grid(row=18, column=0, columnspan=4, sticky="ew", pady=10)
 
         self.run_btn = ttk.Button(frm, text="开始转换", command=self._run)
-        self.run_btn.grid(row=18, column=1, columnspan=2, sticky="ew", padx=6, pady=4)
+        self.run_btn.grid(row=19, column=1, columnspan=2, sticky="ew", padx=6, pady=4)
 
         self.log = scrolledtext.ScrolledText(frm, height=12, state="disabled")
-        self.log.grid(row=19, column=0, columnspan=4, sticky="nsew", pady=6)
-        frm.rowconfigure(19, weight=1)
+        self.log.grid(row=20, column=0, columnspan=4, sticky="nsew", pady=6)
+        frm.rowconfigure(20, weight=1)
         frm.columnconfigure(1, weight=1)
 
     def _log(self, msg):
@@ -186,6 +188,7 @@ class App(tk.Tk):
         common = self._common_params(language, device, hf_token, num_speakers, chapter_gap)
         common["extract_frames"] = self.frames_var.get()
         common["frame_interval"] = frame_interval
+        common["scene_detect"] = self.scene_var.get()
 
         if self.batch_var.get():
             def batch_cb(current, total, filepath, frac, message):
