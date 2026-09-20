@@ -156,7 +156,7 @@ def _cuda_available() -> bool:
 # ---------------------------------------------------------------------------
 # 语音识别
 # ---------------------------------------------------------------------------
-def transcribe(audio_path, model_size="small", language=None,
+def transcribe(audio_path, model_size="large-v3-turbo", language=None,
                device=None, compute_type="auto", progress_callback=None):
     """调用 faster-whisper 将音频转录为文字。
 
@@ -413,7 +413,7 @@ def build_markdown(segments, source_name, info,
 # ---------------------------------------------------------------------------
 # 端到端处理
 # ---------------------------------------------------------------------------
-def process_file(input_path, output_path=None, model_size="small",
+def process_file(input_path, output_path=None, model_size="large-v3-turbo",
                  language=None, device=None, include_timeline=True,
                  include_fulltext=True, keep_audio=False,
                  diarize=False, hf_token=None, num_speakers=None,
@@ -543,7 +543,7 @@ def process_file(input_path, output_path=None, model_size="small",
 # 批量处理
 # ---------------------------------------------------------------------------
 def process_batch(inputs, output_dir=None, output_path=None, combined=False,
-                  model_size="small", language=None, device=None,
+                  model_size="large-v3-turbo", language=None, device=None,
                   include_timeline=True, include_fulltext=True,
                   keep_audio=False, diarize=False, hf_token=None,
                   num_speakers=None, chapters=False, chapter_gap=3.0,

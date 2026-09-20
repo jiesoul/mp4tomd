@@ -38,9 +38,10 @@ def main(argv=None):
     parser.add_argument("-o", "--output", help="单文件输出路径；多文件/合并时会被忽略")
     parser.add_argument("-d", "--output-dir", default=None,
                         help="批量输出目录（默认与每个输入文件同目录）")
-    parser.add_argument("-m", "--model", default="small",
-                        choices=["tiny", "base", "small", "medium", "large-v3"],
-                        help="模型大小，越大越准但越慢（默认 small）")
+    parser.add_argument("-m", "--model", default="large-v3-turbo",
+                        choices=["tiny", "base", "small", "medium",
+                                 "large-v3", "large-v3-turbo"],
+                        help="模型大小，越大越准但越慢（默认 large-v3-turbo；精度接近 large-v3 但更快）")
     parser.add_argument("-l", "--language", default=None,
                         help="语言代码，如 zh、en；留空自动检测")
     parser.add_argument("--device", default=None, choices=["cpu", "cuda"],

@@ -7,7 +7,7 @@
 - 支持视频（mp4/mkv/mov/avi/flv/wmv/webm/m4v）与音频（mp3/wav/m4a/aac/flac/ogg/opus）
 - 本地语音识别，自动检测语言（也可指定 `zh` / `en` 等）
 - 输出 Markdown：带时间戳的 **时间轴** + 合并的 **全文**
-- 🆕 **说话人分离**：区分不同发言人（基于 `pyannote.audio`，可选）
+- 🆕 **说话人分离**：区分不同发言人（基于 `pyannote.audio`，可选，**默认关闭**）
 - 🆕 **自动分章节**：按静音间隔自动切分并生成章节标题
 - 🆕 **可打包为 .exe**：免 Python 环境运行
 - 提供 **图形界面（GUI）** 与 **命令行（CLI）** 两种用法
@@ -35,7 +35,7 @@ pip install -r requirements.txt
 - 验证：`ffmpeg -version`
 - （仅处理 `.wav` / `.mp3` 等纯音频文件时可以不装 ffmpeg。）
 
-### 3. 说话人分离（可选）
+### 3. 说话人分离（可选，默认关闭）
 
 ```powershell
 pip install -r requirements-extra.txt
@@ -94,12 +94,12 @@ python -m mp4tomd.cli sample.wav -m tiny --chapters -o sample.md
 python -m mp4tomd
 ```
 
-打开窗口后：点击「浏览文件」选择单个音视频，或点击「浏览目录」选择文件夹（自动勾选「批量处理」）→ 设置输出、模型、语言 → 勾选「说话人分离」「自动分章节」「合并为单个 MD」等 → 点击「开始转换」。批量模式下「输出」为文件夹，可为每个文件生成同名 `.md`，或合并为一篇汇总。
+打开窗口后：点击「浏览文件」选择单个音视频，或点击「浏览目录」选择文件夹（自动勾选「批量处理」）→ 设置输出、模型、语言 → 按需勾选可选项（「说话人分离」需 HF token、「自动分章节」「合并为单个 MD」等，**默认均不勾选**）→ 点击「开始转换」。批量模式下「输出」为文件夹，可为每个文件生成同名 `.md`，或合并为一篇汇总。
 
 ### 命令行
 
 ```powershell
-# 基本用法（自动检测语言，默认 small 模型）
+# 基本用法（自动检测语言，默认 large-v3-turbo 模型）
 python -m mp4tomd.cli 会议录音.mp4 -o 会议录音.md
 
 # 指定中文、较大模型
@@ -143,10 +143,10 @@ python -m mp4tomd.cli 会议录音/ -c --combined-output 汇总.md
 | --- | --- |
 | `input` | 音视频文件路径（必填） |
 | `-o, --output` | 输出 Markdown 路径，默认与输入同名 `.md` |
-| `-m, --model` | 模型大小：`tiny`/`base`/`small`/`medium`/`large-v3`（默认 `small`） |
+| `-m, --model` | 模型大小：`tiny`/`base`/`small`/`medium`/`large-v3`/`large-v3-turbo`（默认 `large-v3-turbo`） |
 | `-l, --language` | 语言代码，如 `zh` `en`，留空自动检测 |
 | `--device` | `cpu` 或 `cuda`，默认自动 |
-| `--diarize` | 启用说话人分离（需安装 `requirements-extra.txt` 并提供 HF token） |
+| `--diarize` | 启用说话人分离（**默认关闭**；需安装 `requirements-extra.txt` 并提供 HF token） |
 | `--hf-token` | HuggingFace token（也可设环境变量 `HF_TOKEN`） |
 | `--num-speakers` | 已知说话人数量（可选，提升分离效果） |
 | `--chapters` | 按静音间隔自动分章节并生成标题 |
@@ -238,8 +238,9 @@ GUI：勾选「提取关键画面（仅视频）」；勾选「按场景切换�
 | 模型 | 体积 | 速度 | 精度 | 适用 |
 | --- | --- | --- | --- | --- |
 | tiny / base | 小 | 最快 | 一般 | 快速预览 |
-| small | 中 | 快 | 较好 | 日常（默认） |
+| small | 中 | 快 | 较好 | 日常轻量（省内存） |
 | medium | 大 | 慢 | 好 | 高质量 |
+| large-v3-turbo | 大 | 较快 | 很好 | 精度接近 large-v3、速度更快（默认） |
 | large-v3 | 很大 | 最慢 | 最好 | 追求最高精度 |
 
 ## 打包为 .exe（免 Python 运行）

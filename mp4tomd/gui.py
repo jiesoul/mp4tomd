@@ -6,7 +6,7 @@ from tkinter import ttk, filedialog, scrolledtext, messagebox
 
 from . import core
 
-MODEL_CHOICES = ["tiny", "base", "small", "medium", "large-v3"]
+MODEL_CHOICES = ["tiny", "base", "small", "medium", "large-v3", "large-v3-turbo"]
 LANG_CHOICES = ["自动检测", "zh", "en", "ja", "ko", "fr", "de", "es", "ru"]
 MEDIA_FILTER = (
     "音视频",
@@ -45,8 +45,8 @@ class App(tk.Tk):
         ttk.Button(frm, text="浏览输出", command=self._pick_output).grid(row=1, column=2, columnspan=2)
 
         ttk.Label(frm, text="模型").grid(row=2, column=0, sticky="w", pady=3)
-        self.model_var = tk.StringVar(value="small")
-        ttk.OptionMenu(frm, self.model_var, "small", *MODEL_CHOICES).grid(row=2, column=1, sticky="ew", padx=6, pady=3)
+        self.model_var = tk.StringVar(value="large-v3-turbo")
+        ttk.OptionMenu(frm, self.model_var, "large-v3-turbo", *MODEL_CHOICES).grid(row=2, column=1, sticky="ew", padx=6, pady=3)
 
         ttk.Label(frm, text="语言").grid(row=3, column=0, sticky="w", pady=3)
         self.lang_var = tk.StringVar(value="自动检测")
