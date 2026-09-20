@@ -94,7 +94,7 @@ python -m mp4tomd.cli sample.wav -m tiny --chapters -o sample.md
 python -m mp4tomd
 ```
 
-打开窗口后：选择音视频文件 → 设置输出、模型、语言 → 勾选「说话人分离」「自动分章节」→ 点击「开始转换」。
+打开窗口后：点击「浏览文件」选择单个音视频，或点击「浏览目录」选择文件夹（自动勾选「批量处理」）→ 设置输出、模型、语言 → 勾选「说话人分离」「自动分章节」「合并为单个 MD」等 → 点击「开始转换」。批量模式下「输出」为文件夹，可为每个文件生成同名 `.md`，或合并为一篇汇总。
 
 ### 命令行
 
@@ -111,6 +111,31 @@ python -m mp4tomd.cli 会议.mp4 --diarize --hf-token hf_xxx --num-speakers 3 --
 # 仅生成全文、不生成时间轴
 python -m mp4tomd.cli 视频.mp4 --no-timeline
 ```
+
+#### 批量处理（多个文件 / 目录 / 通配符）
+
+`input` 可接收 **多个** 参数，并支持目录与通配符（`*`），自动跳过不支持的文件：
+
+```powershell
+# 处理一个目录下的全部音视频（同目录输出 .md）
+python -m mp4tomd.cli 会议录音/ -o 忽略此值
+
+# 处理匹配通配符的多个文件，统一输出到 out/ 目录
+python -m mp4tomd.cli "*.mp3" -d out/
+
+# 递归处理子目录
+python -m mp4tomd.cli 素材/ -r -d out/
+
+# 同时传入多种来源（文件 + 目录 + 通配符）
+python -m mp4tomd.cli 会议.mp4 讲座/ "tmp/*.wav" -d out/
+
+# 额外生成一个合并汇总文档（所有文件合入一篇 Markdown）
+python -m mp4tomd.cli 会议录音/ -c -d out/
+python -m mp4tomd.cli 会议录音/ -c --combined-output 汇总.md
+```
+
+> 当 `input` 多于一个，或显式传入目录 / 通配符时，会进入批量模式：每个文件生成一个同名 `.md`，失败的文件不影响其余；加上 `-c` 还会额外生成 `批量转录汇总.md`（每篇文档作为 `##` 小节归入一篇）。
+> 单文件用法保持与以前一致，`-o` 指定输出路径仍然有效。
 
 参数说明：
 
@@ -129,6 +154,10 @@ python -m mp4tomd.cli 视频.mp4 --no-timeline
 | `--no-timeline` | 不生成时间轴 |
 | `--no-fulltext` | 不生成全文 |
 | `--keep-audio` | 保留提取的临时音频 |
+| `-d, --output-dir` | 批量输出目录（默认与每个输入文件同目录） |
+| `-r, --recursive` | 递归处理目录（含子目录） |
+| `-c, --combined` | 额外生成合并汇总 Markdown（所有文件合入一篇） |
+| `--combined-output` | 合并汇总文件的输出路径（配合 `-c`） |
 
 ## 输出的 Markdown 示例
 

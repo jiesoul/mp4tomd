@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import datetime
+import glob
 import os
 import shutil
 import subprocess
@@ -15,6 +16,58 @@ import subprocess
 # 支持的文件类型
 SUPPORTED_VIDEO_EXT = {".mp4", ".mkv", ".mov", ".avi", ".flv", ".wmv", ".webm", ".m4v"}
 SUPPORTED_AUDIO_EXT = {".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".opus"}
+
+
+def is_supported(filepath: str) -> bool:
+    """判断文件是否为受支持的类型。"""
+    ext = os.path.splitext(filepath)[1].lower()
+    return ext in SUPPORTED_VIDEO_EXT or ext in SUPPORTED_AUDIO_EXT
+
+
+def resolve_inputs(inputs, recursive=False):
+    """把「文件 / 目录 / 通配符」混合列表展开为去重、排序后的受支持文件清单。
+
+    不支持的文件会被跳过（不抛异常）。
+    """
+    resolved = []
+    for item in inputs:
+        for path in glob.glob(item) or [item]:
+            if os.path.isdir(path):
+                if recursive:
+                    for root, _dirs, files in os.walk(path):
+                        for name in files:
+                            fp = os.path.join(root, name)
+                            if is_supported(fp):
+                                resolved.append(fp)
+                else:
+                    for name in sorted(os.listdir(path)):
+                        fp = os.path.join(path, name)
+                        if os.path.isfile(fp) and is_supported(fp):
+                            resolved.append(fp)
+            elif os.path.isfile(path):
+                if is_supported(path):
+                    resolved.append(path)
+    # 去重并保持相对顺序，最后排序便于稳定输出
+    seen, ordered = set(), []
+    for fp in resolved:
+        af = os.path.abspath(fp)
+        if af not in seen:
+            seen.add(af)
+            ordered.append(fp)
+    return sorted(ordered)
+
+
+def _shift_headings(markdown: str, levels: int) -> str:
+    """把 Markdown 的 ATX 标题整体下移 levels 级（用于合并文档时避免标题层级冲突）。"""
+    out = []
+    for line in markdown.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith("#") and not stripped.startswith("######"):
+            prefix = stripped[:len(stripped) - len(stripped.lstrip("#"))]
+            if len(prefix) < 6:
+                line = "#" * levels + line
+        out.append(line)
+    return "\n".join(out)
 
 # 说话人标签字母表（A, B, C ...）
 _SPEAKER_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -337,3 +390,102 @@ def process_file(input_path, output_path=None, model_size="small",
                 os.remove(tmp_audio)
             except OSError:
                 pass
+
+
+# ---------------------------------------------------------------------------
+# 批量处理
+# ---------------------------------------------------------------------------
+def process_batch(inputs, output_dir=None, output_path=None, combined=False,
+                  model_size="small", language=None, device=None,
+                  include_timeline=True, include_fulltext=True,
+                  keep_audio=False, diarize=False, hf_token=None,
+                  num_speakers=None, chapters=False, chapter_gap=3.0,
+                  recursive=False, progress_callback=None) -> dict:
+    """批量处理多个文件 / 目录 / 通配符。
+
+    progress_callback 签名为 (current, total, filepath, frac, message)。
+
+    返回字典：
+        {
+            "files": [...输入清单...],
+            "outputs": [...每个文件生成的 md 路径...],
+            "combined": 合并文档路径或 None,
+            "errors": [(filepath, error_str), ...],
+        }
+    """
+    files = resolve_inputs(inputs, recursive=recursive)
+    if not files:
+        raise FileNotFoundError("没有匹配到任何受支持的文件。")
+
+    total = len(files)
+    outputs, errors, bodies = [], [], []
+
+    for idx, fp in enumerate(files, start=1):
+        if progress_callback:
+            progress_callback(idx, total, fp, 0.0, "排队中…")
+        try:
+            single_output = output_path if (total == 1 and output_path) else None
+            if single_output is None:
+                if output_dir:
+                    os.makedirs(output_dir, exist_ok=True)
+                    base = os.path.splitext(os.path.basename(fp))[0] + ".md"
+                    single_output = os.path.join(output_dir, base)
+                else:
+                    single_output = None  # process_file 默认与输入同名
+
+            def _cb(frac, msg):
+                if progress_callback:
+                    progress_callback(idx, total, fp, frac, msg)
+
+            out = process_file(
+                fp, output_path=single_output,
+                model_size=model_size, language=language, device=device,
+                include_timeline=include_timeline,
+                include_fulltext=include_fulltext,
+                keep_audio=keep_audio,
+                diarize=diarize, hf_token=hf_token,
+                num_speakers=num_speakers, chapters=chapters,
+                chapter_gap=chapter_gap, progress_callback=_cb,
+            )
+            outputs.append(out)
+            if combined:
+                with open(out, "r", encoding="utf-8") as f:
+                    bodies.append((os.path.splitext(os.path.basename(fp))[0], f.read()))
+        except Exception as e:  # 单个文件失败不影响其余
+            errors.append((fp, str(e)))
+            if progress_callback:
+                progress_callback(idx, total, fp, 1.0, f"失败：{e}")
+
+    combined_path = None
+    if combined and bodies:
+        combined_path = output_path if (output_path and total > 1) else None
+        if combined_path is None:
+            if output_dir:
+                combined_path = os.path.join(output_dir, "批量转录汇总.md")
+            else:
+                combined_path = os.path.join(
+                    os.path.dirname(files[0]) or ".", "批量转录汇总.md"
+                )
+        header = [
+            f"# 批量转录汇总（共 {len(bodies)} 个文件）",
+            "",
+            f"> 生成时间：{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  ",
+            f"> 模型：{model_size}  ",
+            f"> 识别语言：{language or '自动检测'}",
+            "",
+        ]
+        parts = [("\n".join(header))]
+        for name, body in bodies:
+            # 把每篇文档的标题整体下移一级，避免与汇总标题冲突
+            shifted = _shift_headings(body, 1)
+            # 把首行 "# xxx · 转录文稿" 替换为 "## xxx"
+            parts.append(shifted)
+        with open(combined_path, "w", encoding="utf-8") as f:
+            f.write("\n\n".join(parts) + "\n")
+
+    return {
+        "files": files,
+        "outputs": outputs,
+        "combined": combined_path,
+        "errors": errors,
+    }
