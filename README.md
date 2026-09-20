@@ -156,6 +156,8 @@ python -m mp4tomd.cli 会议录音/ -c --combined-output 汇总.md
 | `--keep-audio` | 保留提取的临时音频 |
 | `--no-txt` | 不生成最初的纯文本稿 `.txt` |
 | `--no-srt` | 不生成最初的 SRT 字幕 `.srt` |
+| `--frames` | 提取关键画面并嵌入 Markdown（仅视频） |
+| `--frame-interval` | 无章节时关键画面截取间隔（秒，默认 60） |
 | `-d, --output-dir` | 批量输出目录（默认与每个输入文件同目录） |
 | `-r, --recursive` | 递归处理目录（含子目录） |
 | `-c, --combined` | 额外生成合并汇总 Markdown（所有文件合入一篇） |
@@ -200,6 +202,28 @@ python -m mp4tomd.cli 会议录音/ -c --combined-output 汇总.md
 
 > 工作流建议：`txt` / `srt` 是第一手原始稿，人工校对或润色后，整理进 `md` 作为最终成品。
 > 若不需要原始稿，可用 `--no-txt` / `--no-srt` 关闭（GUI 暂默认全部生成）。
+
+## 关键画面提取（仅视频）
+
+对视频文件，可在关键时间点用 ffmpeg 截取画面，并以 `![关键画面 @时间](图片)` 的形式嵌入 Markdown：
+
+- 开启 `--chapters` 时：在每个**章节起点**截图，直接嵌在对应章节标题下方；
+- 未开启 `--chapters` 时：按固定间隔 `--frame-interval`（默认 60 秒）截图，单独生成「## 关键画面」小节；
+- 截取的图片保存在 `<源文件名>_frames/` 子目录（PNG），Markdown 中以相对路径引用，**请连同该文件夹一起分发**才能保证图片显示。
+
+> 纯音频文件无画面，开启此选项会被自动忽略。此功能依赖 ffmpeg。
+
+CLI：
+
+```powershell
+# 按章节提取关键画面
+python -m mp4tomd.cli 会议.mp4 --chapters --frames
+
+# 无章节时每 30 秒截一帧
+python -m mp4tomd.cli 讲座.mp4 --frames --frame-interval 30
+```
+
+GUI：勾选「提取关键画面（仅视频）」，并可在「画面间隔(秒)」设置间隔。
 
 ## 模型选择建议
 

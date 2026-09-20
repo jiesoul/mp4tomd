@@ -93,6 +93,27 @@ def extract_audio(video_path: str, output_wav: str | None = None, sample_rate: i
     return output_wav
 
 
+def extract_key_frames(video_path: str, timestamps, out_dir: str) -> list:
+    """在指定时间戳处用 ffmpeg 截取关键画面，返回 [(timestamp, 图片路径), ...]。
+
+    仅对视频文件有效；任一帧截取失败会被跳过。
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    results = []
+    for i, ts in enumerate(timestamps, start=1):
+        out_path = os.path.join(out_dir, f"frame_{i:03d}.png")
+        cmd = [
+            "ffmpeg", "-y", "-ss", f"{float(ts):.3f}", "-i", video_path,
+            "-frames:v", "1", "-q:v", "2", out_path,
+        ]
+        try:
+            subprocess.run(cmd, capture_output=True, text=True, check=True)
+            results.append((float(ts), out_path))
+        except subprocess.CalledProcessError:
+            continue
+    return results
+
+
 def _cuda_available() -> bool:
     try:
         import torch
@@ -294,7 +315,8 @@ def build_srt(segments, speakers=False) -> str:
 
 def build_markdown(segments, source_name, info,
                    include_timeline=True, include_fulltext=True,
-                   speakers=False, chapters=False, chapter_gap=3.0) -> str:
+                   speakers=False, chapters=False, chapter_gap=3.0,
+                   frames=None) -> str:
     sp_map = _build_speaker_map(segments) if speakers else {}
 
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -322,6 +344,8 @@ def build_markdown(segments, source_name, info,
         lines.append("")
 
     if chapters:
+        # 章节 -> 关键画面 映射（按章节起点时间戳）
+        frame_by_ts = {ts: path for ts, path in (frames or [])}
         lines.append("## 章节")
         lines.append("")
         for ch in split_chapters(segments, chapter_gap):
@@ -329,9 +353,20 @@ def build_markdown(segments, source_name, info,
             ts = format_timestamp(ch["start"])
             lines.append(f"### 第 {ch['index']} 节 · {heading}  `[{ts}]`")
             lines.append("")
+            fpath = frame_by_ts.get(ch["start"])
+            if fpath:
+                lines.append(f"![关键画面 @{ts}]({fpath})")
+                lines.append("")
             for seg in ch["segments"]:
                 prefix = _speaker_prefix(seg, sp_map) if speakers else ""
                 lines.append(f"{prefix}{seg['text']}")
+            lines.append("")
+
+    if frames and not chapters:
+        lines.append("## 关键画面")
+        lines.append("")
+        for ts, path in frames:
+            lines.append(f"![关键画面 @{format_timestamp(ts)}]({path})")
             lines.append("")
 
     if include_fulltext:
@@ -353,6 +388,7 @@ def process_file(input_path, output_path=None, model_size="small",
                  diarize=False, hf_token=None, num_speakers=None,
                  chapters=False, chapter_gap=3.0,
                  include_txt=True, include_srt=True,
+                 extract_frames=False, frame_interval=60.0,
                  progress_callback=None) -> dict:
     if not os.path.isfile(input_path):
         raise FileNotFoundError(f"找不到输入文件：{input_path}")
@@ -395,6 +431,36 @@ def process_file(input_path, output_path=None, model_size="small",
                 progress_callback(0.92, "说话人分离完成")
 
         source_name = os.path.splitext(os.path.basename(input_path))[0]
+
+        if output_path is None:
+            output_path = os.path.splitext(input_path)[0] + ".md"
+        md_dir = os.path.dirname(output_path)
+        base = os.path.splitext(output_path)[0]
+
+        # 关键画面提取（仅视频文件有效）
+        frames = []
+        if extract_frames and ext in SUPPORTED_VIDEO_EXT:
+            if not check_ffmpeg():
+                raise RuntimeError(
+                    "未检测到 ffmpeg，关键画面提取需要 ffmpeg。"
+                    "请安装 ffmpeg 并加入 PATH（Windows：https://www.gyan.dev/ffmpeg/builds/）。"
+                )
+            if chapters:
+                chs = split_chapters(segments, chapter_gap)
+                timestamps = [ch["start"] for ch in chs]
+            else:
+                dur = getattr(info, "duration", None) or 0.0
+                step = max(int(frame_interval), 1)
+                timestamps = list(range(0, int(dur), step))
+                if not timestamps:
+                    timestamps = [0.0]
+            frame_dir = os.path.join(md_dir, source_name + "_frames")
+            extracted = extract_key_frames(input_path, timestamps, frame_dir)
+            frames = [
+                (ts, os.path.relpath(p, md_dir).replace(os.sep, "/"))
+                for ts, p in extracted
+            ]
+
         markdown = build_markdown(
             segments, source_name, info,
             include_timeline=include_timeline,
@@ -402,11 +468,9 @@ def process_file(input_path, output_path=None, model_size="small",
             speakers=diarize,
             chapters=chapters,
             chapter_gap=chapter_gap,
+            frames=frames,
         )
 
-        if output_path is None:
-            output_path = os.path.splitext(input_path)[0] + ".md"
-        base = os.path.splitext(output_path)[0]
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(markdown)
         out_files = {"md": output_path}
@@ -445,6 +509,7 @@ def process_batch(inputs, output_dir=None, output_path=None, combined=False,
                   keep_audio=False, diarize=False, hf_token=None,
                   num_speakers=None, chapters=False, chapter_gap=3.0,
                   include_txt=True, include_srt=True,
+                  extract_frames=False, frame_interval=60.0,
                   recursive=False, progress_callback=None) -> dict:
     """批量处理多个文件 / 目录 / 通配符。
 
@@ -492,6 +557,7 @@ def process_batch(inputs, output_dir=None, output_path=None, combined=False,
                 num_speakers=num_speakers, chapters=chapters,
                 chapter_gap=chapter_gap,
                 include_txt=include_txt, include_srt=include_srt,
+                extract_frames=extract_frames, frame_interval=frame_interval,
                 progress_callback=_cb,
             )
             outputs.append(out)

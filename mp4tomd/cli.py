@@ -49,6 +49,11 @@ def main(argv=None):
     parser.add_argument("--no-fulltext", action="store_true", help="不生成全文")
     parser.add_argument("--no-txt", action="store_true", help="不生成最初的纯文本稿 .txt")
     parser.add_argument("--no-srt", action="store_true", help="不生成最初的 SRT 字幕 .srt")
+    # 关键画面
+    parser.add_argument("--frames", action="store_true",
+                        help="提取关键画面（仅视频；默认按章节起点，无章节则按固定间隔）")
+    parser.add_argument("--frame-interval", type=float, default=60.0,
+                        help="无章节时关键画面的截取间隔（秒，默认 60）")
     parser.add_argument("--keep-audio", action="store_true", help="保留提取的临时音频")
     # 说话人分离
     parser.add_argument("--diarize", action="store_true", help="启用说话人分离（需 pyannote + HF token）")
@@ -75,6 +80,8 @@ def main(argv=None):
         keep_audio=args.keep_audio,
         include_txt=not args.no_txt,
         include_srt=not args.no_srt,
+        extract_frames=args.frames,
+        frame_interval=args.frame_interval,
         diarize=args.diarize,
         hf_token=args.hf_token,
         num_speakers=args.num_speakers,
