@@ -265,6 +265,33 @@ def format_timestamp(seconds: float) -> str:
     return f"{m:02d}:{s:02d}"
 
 
+def format_srt_timestamp(seconds: float) -> str:
+    """SRT 格式时间戳：HH:MM:SS,mmm（毫秒用逗号）。"""
+    total_ms = int(round(seconds * 1000))
+    h, rem = divmod(total_ms, 3600000)
+    m, rem = divmod(rem, 60000)
+    s, ms = divmod(rem, 1000)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def build_txt(segments) -> str:
+    """生成最初的纯文本稿（不含时间戳/说话人，逐段一行）。"""
+    return "\n".join(seg["text"] for seg in segments if seg["text"].strip()) + "\n"
+
+
+def build_srt(segments, speakers=False) -> str:
+    """生成 SRT 字幕（带起止时间戳，可选说话人前缀）。"""
+    sp_map = _build_speaker_map(segments) if speakers else {}
+    blocks = []
+    for i, seg in enumerate(segments, start=1):
+        start = format_srt_timestamp(seg["start"])
+        end = format_srt_timestamp(seg["end"])
+        prefix = _speaker_prefix(seg, sp_map) if speakers else ""
+        text = (prefix + seg["text"]).strip()
+        blocks.append(f"{i}\n{start} --> {end}\n{text}")
+    return "\n\n".join(blocks) + "\n"
+
+
 def build_markdown(segments, source_name, info,
                    include_timeline=True, include_fulltext=True,
                    speakers=False, chapters=False, chapter_gap=3.0) -> str:
@@ -325,7 +352,8 @@ def process_file(input_path, output_path=None, model_size="small",
                  include_fulltext=True, keep_audio=False,
                  diarize=False, hf_token=None, num_speakers=None,
                  chapters=False, chapter_gap=3.0,
-                 progress_callback=None) -> str:
+                 include_txt=True, include_srt=True,
+                 progress_callback=None) -> dict:
     if not os.path.isfile(input_path):
         raise FileNotFoundError(f"找不到输入文件：{input_path}")
 
@@ -378,12 +406,28 @@ def process_file(input_path, output_path=None, model_size="small",
 
         if output_path is None:
             output_path = os.path.splitext(input_path)[0] + ".md"
+        base = os.path.splitext(output_path)[0]
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(markdown)
+        out_files = {"md": output_path}
+
+        # 最初的纯文本稿
+        if include_txt:
+            txt_path = base + ".txt"
+            with open(txt_path, "w", encoding="utf-8") as f:
+                f.write(build_txt(segments))
+            out_files["txt"] = txt_path
+
+        # 最初的 SRT 字幕（带时间戳）
+        if include_srt:
+            srt_path = base + ".srt"
+            with open(srt_path, "w", encoding="utf-8") as f:
+                f.write(build_srt(segments, speakers=diarize))
+            out_files["srt"] = srt_path
 
         if progress_callback:
             progress_callback(1.0, "完成")
-        return output_path
+        return out_files
     finally:
         if tmp_audio and not keep_audio and os.path.exists(tmp_audio):
             try:
@@ -400,6 +444,7 @@ def process_batch(inputs, output_dir=None, output_path=None, combined=False,
                   include_timeline=True, include_fulltext=True,
                   keep_audio=False, diarize=False, hf_token=None,
                   num_speakers=None, chapters=False, chapter_gap=3.0,
+                  include_txt=True, include_srt=True,
                   recursive=False, progress_callback=None) -> dict:
     """批量处理多个文件 / 目录 / 通配符。
 
@@ -445,11 +490,13 @@ def process_batch(inputs, output_dir=None, output_path=None, combined=False,
                 keep_audio=keep_audio,
                 diarize=diarize, hf_token=hf_token,
                 num_speakers=num_speakers, chapters=chapters,
-                chapter_gap=chapter_gap, progress_callback=_cb,
+                chapter_gap=chapter_gap,
+                include_txt=include_txt, include_srt=include_srt,
+                progress_callback=_cb,
             )
             outputs.append(out)
             if combined:
-                with open(out, "r", encoding="utf-8") as f:
+                with open(out["md"], "r", encoding="utf-8") as f:
                     bodies.append((os.path.splitext(os.path.basename(fp))[0], f.read()))
         except Exception as e:  # 单个文件失败不影响其余
             errors.append((fp, str(e)))

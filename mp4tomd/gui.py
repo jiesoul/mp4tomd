@@ -189,7 +189,10 @@ class App(tk.Tk):
         try:
             result = core.process_file(in_path, output_path=out_path,
                                        progress_callback=self._set_progress, **common)
-            self._log(f"✅ 已生成：{result}\n")
+            self._log("✅ 已生成：\n")
+            for k in ("md", "txt", "srt"):
+                if result.get(k):
+                    self._log(f"   - {result[k]}\n")
         except Exception as e:
             self._log(f"❌ 错误：{e}\n")
         finally:
@@ -209,7 +212,9 @@ class App(tk.Tk):
             )
             self._log(f"✅ 成功 {len(result['outputs'])} 个，失败 {len(result['errors'])} 个。\n")
             for o in result["outputs"]:
-                self._log(f"   - {o}\n")
+                for k in ("md", "txt", "srt"):
+                    if o.get(k):
+                        self._log(f"   - {o[k]}\n")
             if result["combined"]:
                 self._log(f"   [合并] {result['combined']}\n")
             for fp, msg in result["errors"]:

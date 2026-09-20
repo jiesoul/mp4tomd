@@ -47,6 +47,8 @@ def main(argv=None):
                         help="推理设备，默认自动（有 GPU 用 cuda）")
     parser.add_argument("--no-timeline", action="store_true", help="不生成时间轴")
     parser.add_argument("--no-fulltext", action="store_true", help="不生成全文")
+    parser.add_argument("--no-txt", action="store_true", help="不生成最初的纯文本稿 .txt")
+    parser.add_argument("--no-srt", action="store_true", help="不生成最初的 SRT 字幕 .srt")
     parser.add_argument("--keep-audio", action="store_true", help="保留提取的临时音频")
     # 说话人分离
     parser.add_argument("--diarize", action="store_true", help="启用说话人分离（需 pyannote + HF token）")
@@ -71,6 +73,8 @@ def main(argv=None):
         include_timeline=not args.no_timeline,
         include_fulltext=not args.no_fulltext,
         keep_audio=args.keep_audio,
+        include_txt=not args.no_txt,
+        include_srt=not args.no_srt,
         diarize=args.diarize,
         hf_token=args.hf_token,
         num_speakers=args.num_speakers,
@@ -99,7 +103,10 @@ def main(argv=None):
         except Exception as e:
             print(f"\n错误：{e}", file=sys.stderr)
             return 1
-        print(f"\n[OK] 已生成 Markdown：{out}")
+        print("\n[OK] 已生成：")
+        for k in ("md", "txt", "srt"):
+            if out.get(k):
+                print(f"  - {out[k]}")
         return 0
 
     # 批处理（含 --combined 单文件汇总场景）
@@ -121,7 +128,9 @@ def main(argv=None):
     err = len(result["errors"])
     print(f"\n[完成] 成功 {ok} 个，失败 {err} 个，共 {len(result['files'])} 个文件。")
     for o in result["outputs"]:
-        print(f"  - {o}")
+        for k in ("md", "txt", "srt"):
+            if o.get(k):
+                print(f"  - {o[k]}")
     if result["combined"]:
         print(f"  [合并] {result['combined']}")
     for fp, msg in result["errors"]:
