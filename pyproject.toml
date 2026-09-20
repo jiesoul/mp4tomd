@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mp4tomd"
+version = "0.1.0"
+description = "音视频转文字并导出 Markdown 的本地程序（含说话人分离与自动分章节）"
+requires-python = ">=3.8"
+dependencies = ["faster-whisper>=1.0.0"]
+
+[project.optional-dependencies]
+diarize = [
+    "pyannote.audio>=3.1.0",
+    "huggingface_hub>=0.24.0",
+    "torch>=2.0.0",
+    "torchaudio>=2.0.0",
+]
+build = ["pyinstaller>=6.0.0"]
+
+[project.scripts]
+mp4tomd = "mp4tomd.cli:main"
+mp4tomd-gui = "mp4tomd.gui:main"
+
+[tool.setuptools]
+packages = ["mp4tomd"]

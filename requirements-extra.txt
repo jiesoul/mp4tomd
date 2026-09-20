@@ -1,0 +1,8 @@
+# 说话人分离（可选）所需额外依赖。
+# 安装前请先到 https://hf.co/pyannote/speaker-diarization-3.1 与
+# https://hf.co/pyannote/segmentation-3.0 同意模型许可。
+# 并准备 HuggingFace token（https://hf.co/settings/tokens）。
+pyannote.audio>=3.1.0
+huggingface_hub>=0.24.0
+torch>=2.0.0
+torchaudio>=2.0.0
