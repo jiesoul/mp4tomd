@@ -61,7 +61,7 @@ def main(argv=None):
         print(f"\n错误：{e}", file=sys.stderr)
         return 1
 
-    print(f"\n✅ 已生成 Markdown：{out}")
+    print(f"\n[OK] 已生成 Markdown：{out}")
     return 0
 
 
