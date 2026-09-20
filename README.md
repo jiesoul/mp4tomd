@@ -52,6 +52,40 @@ pip install -r requirements-extra.txt
 $env:HF_TOKEN = "hf_xxxxxxxxxxxx"
 ```
 
+## 受限网络环境与离线测试
+
+### 模型 / 依赖下载走国内镜像
+
+如果在中国大陆等网络受限环境，`huggingface.co` 与 `github.com` 的部分资源可能被屏蔽，导致模型权重或 pip 包下载缓慢甚至失败。可用镜像解决：
+
+```powershell
+# 1) 模型权重走 HF 镜像
+$env:HF_ENDPOINT = "https://hf-mirror.com"
+
+# 2) pip 包走清华镜像（安装更快）
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+> 设置 `HF_ENDPOINT` 后，faster-whisper 会从镜像拉取模型；运行本程序前保持该环境变量即可（也可写入系统环境变量永久生效）。
+
+### 没有样例音频？用 Windows 自带 TTS 离线生成
+
+仓库内置 `make_sample.py`：利用 Windows 系统语音合成（`pyttsx3`，无需联网、无需外部音频文件）生成一段测试语音 `sample.wav`，可直接喂给本程序验证「音频 → 文字 → MD」全流程：
+
+```powershell
+# 安装 TTS 依赖（仅测试时需要）
+pip install pyttsx3
+
+# 生成 sample.wav（约 4 秒英文语音，内容为预设测试句）
+python make_sample.py
+
+# 转录并生成带章节的 Markdown
+$env:HF_ENDPOINT = "https://hf-mirror.com"   # 如网络受限请保留
+python -m mp4tomd.cli sample.wav -m tiny --chapters -o sample.md
+```
+
+生成的 `sample.md` 即为一个真实转录示例（结构见上方「输出的 Markdown 示例」）。验证完成后可删除 `sample.wav` / `sample.md`（`sample.wav` 已在 `.gitignore` 中忽略，不会误提交）。
+
 ## 使用方法
 
 ### 图形界面（推荐）
